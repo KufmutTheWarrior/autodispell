@@ -1,0 +1,7 @@
+## Interface: 32790
+## Version: 1.13.3
+## Title: AutoDispell
+## Notes: Automagically removes certain unwanted buffs
+## Author: Kufmut
+##SavedVariablesPerCharacter: buffs, isEnabled
+AutoDispell.lua

@@ -3,5 +3,5 @@
 ## Title: AutoDispell
 ## Notes: Automagically removes certain unwanted buffs
 ## Author: Kufmut
-##SavedVariablesPerCharacter: buffs, isEnabled
+##SavedVariablesPerCharacter: buffs, isEnabled, profiles, activeProfile
 AutoDispell.lua

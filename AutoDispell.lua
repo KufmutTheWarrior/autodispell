@@ -241,7 +241,6 @@ lFrame:SetScript("OnEvent", function(self, event, ...)
         if profiles == nil then     
             profiles = {}       
             profiles[1] = {"default"}
-            profiles[2] = {"tank"}
         end
         if activeProfile == nil then
             activeProfile = 1

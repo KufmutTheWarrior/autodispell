@@ -13,13 +13,8 @@ ARG_PSEL = "select"
 --Local Buffs array, AutoDispell and Load frame
 local adFrame = CreateFrame("Frame")
 local lFrame = CreateFrame("Frame")
-local lbuffs = {}
-local profiles = {} --2d array, profiles & their respective buffs
-local activeProfile
+local lbuffs = {}--2d array, profiles & their respective buffs
 local profileName = 1
-profiles[1] = {"default"}
-profiles[2] = {"tank"}
-activeProfile = profiles[profileName]
 
 --Register events
 adFrame:RegisterEvent("UNIT_AURA", arg1)
@@ -45,19 +40,19 @@ end
 
 local function has_value (tab, val)
     for index, value in ipairs(tab) do
-        if value == val then
+        if tab[index][profileName] == val then
             return true
         end
     end
     return false
 end
 
-local function get_index(val)
-    local index={}
-    for k,v in pairs(val) do
-        index[v]=k
+local function get_index(tab, val)
+    for i,v in pairs(tab) do
+        if tab[i][profileName] == val then
+            return i
+        end
     end
-    return index[val]
 end
 
 --Help function
@@ -153,8 +148,8 @@ end
 local function ListProfiles()
     print("Profiles:")
     for i=1,table.getn(profiles),1 do
-        if activeProfile==profiles[i] then
-            print(string.format("%i: %s (Active)", i, profiles[i][profileName]))
+        if activeProfile == i then
+            print(string.format("%i: %s (Active)", i, profiles[activeProfile][profileName]))
         else
             print(string.format("%i: %s", i, profiles[i][profileName]))
         end
@@ -166,26 +161,73 @@ local function SetProfile(val)
     if is_int(val) then
         valn = tonumber(val)
         if valn <= table.getn(profiles) and valn >= 1 then
-            if profiles[valn] == activeProfile then
-                print(string.format("Profile: '%s' is already selected.", profiles[valn]))
+            if valn == activeProfile then
+                print(string.format("Profile: '%s' is already selected.", profiles[valn][profileName]))
             else
-                activeProfile = profiles[valn]
-                print(string.format("Selected profile: '%s'", activeProfile[1]))
+                activeProfile = valn
+                print(string.format("Selected profile: '%s'", profiles[activeProfile][profileName]))
             end
         else
             print("Profile does not exist")
         end
     else
         if has_value(profiles, val) then 
-            if activeProfile == profiles[get_index(val)] then
+            if activeProfile == get_index(profiles, val) then
                 print(string.format("Profile: '%s' is already selected.", val))
             else
-                activeProfile = profiles[get_index(val)]
-                print(string.format("Selected profile: '%s'", profiles[get_index(val)]))                
+                activeProfile = get_index(profiles, val)
+                print(string.format("Selected profile: '%s'", profiles[activeProfile][profileName]))                
             end
         else
             print("Profile does not exist")
         end
+    end
+end
+
+--Add a profile, only accepts strings
+local function AddProfile(name)
+    if is_int(name) then
+        print("Please enter a valid profile name.")
+        return
+    elseif has_value(profiles, name) then 
+        print(string.format("Profile: '%s' already exists", name))
+    else
+        profiles[table.getn(profiles)+1] = { name }
+        print(string.format("Added new profile: %s", name))
+        SetProfile(name)          
+    end
+    return true
+end
+
+--Remove a profile by index or name
+local function RemoveProfile(val)
+    if is_int(val) then
+        valn = tonumber(val)
+        if valn <= table.getn(profiles) and valn ~= activeProfile then
+            table.remove(profiles, valn)
+            if activeProfile > table.getn(profiles) then
+                activeProfile = activeProfile - 1
+            end
+            return true
+        elseif valn < 1 then
+            print("Profile not found.")
+        else            
+            print("Cannot remove active profile")
+        end
+        return false
+    elseif has_value(profiles, val) then   
+        if get_index(profiles, val) ~= activeProfile then      
+            table.remove(profiles,get_index(profiles, val))
+            if activeProfile > table.getn(profiles) then
+                activeProfile = activeProfile - 1
+            end
+            return true
+        else
+            print("Cannot remove active profile")
+        end
+    else
+        print("Profile not found.")
+        return false
     end
 end
 
@@ -195,6 +237,14 @@ lFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         if buffs == nil then
             buffs = {}
+        end
+        if profiles == nil then     
+            profiles = {}       
+            profiles[1] = {"default"}
+            profiles[2] = {"tank"}
+        end
+        if activeProfile == nil then
+            activeProfile = 1
         end
         if isEnabled == nil then
             print("AutoDispell has been automatically enabled. Use /ad to configure it.")
@@ -250,6 +300,12 @@ SlashCmdList["AUTOD"] = function(msg, editbox)
             ListProfiles()
         elseif splitargs[1] == ARG_PSEL and splitargs[2] ~= nil then
             SetProfile(splitargs[2])
+        elseif splitargs[1] == ARG_ADD and splitargs[2] ~= nil then
+            AddProfile(splitargs[2])
+        elseif splitargs[1] == ARG_REMOVE or splitargs[2] == ARG_RM and splitargs[2] ~= nil then
+            if RemoveProfile(splitargs[2]) then
+                print("Profile was successfully removed.")
+            end
         end
     else
 

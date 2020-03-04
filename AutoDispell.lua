@@ -190,6 +190,7 @@ end
 --Adds the eventbinding, called on first start or /ad enable
 local function AddEventBinding()
     adFrame:SetScript("OnEvent", function(self, event, ...) 
+        adFrame:SetScript("OnEvent", nil)
         Dispell(...)
     end)
 end

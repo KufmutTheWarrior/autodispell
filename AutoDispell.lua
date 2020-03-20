@@ -12,11 +12,11 @@ ARG_PSELS = "sel"
 ARG_ENABLE = "enable"
 ARG_DISABLE = "disable"
 --Local Buffs array, AutoDispell and Load frame
-local adFrame = CreateFrame("Frame")
-local lFrame = CreateFrame("Frame")
-local lbuffs = {}--2d array, profiles & their respective buffs
-local profileName = 1
-local buffList = 2
+adFrame = CreateFrame("Frame")
+lFrame = CreateFrame("Frame")
+lbuffs = {}--2d array, profiles & their respective buffs
+profileName = 1
+buffList = 2
 
 --Register events
 adFrame:RegisterEvent("UNIT_AURA", arg1)
@@ -42,22 +42,26 @@ end
 
 local function has_value (tab, val, type)
     if type == profileName then
-        for i, value in ipairs(tab) do
-            if tab[i][type] ~= nil then
-                if tab[i][type] == val then
+        for i=1, #tab, 1 do
+            if is_int(val) then
+                if tab[i] == val then
+                    return true
+                end
+            else
+                if tab[i][profileName] == val then
                     return true
                 end
             end
         end
     else
-    for i, v in ipairs(tab[activeProfile][type]) do
-        if tab[activeProfile][type][i] ~= nil then
-            if tab[activeProfile][type][i] == val then
-                return true
+        for i, v in ipairs(tab[activeProfile][type]) do
+            if tab[activeProfile][type][i] ~= nil then
+                if tab[activeProfile][type][i] == val then
+                    return true
+                end
             end
         end
     end
-end
     return false
 end
 

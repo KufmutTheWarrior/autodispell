@@ -4,6 +4,8 @@ SLASH_AUTOD2 = "/autod"
 ARG_BUFF = "buffs"
 ARG_PLIST = "profiles"
 ARG_LIST = "list"
+ARG_VERB = "verbose"
+ARG_ALERT = "alert"
 ARG_ADD = "add"
 ARG_REMOVE = "remove"
 ARG_RM = "rm"
@@ -11,16 +13,29 @@ ARG_PSEL = "select"
 ARG_PSELS = "sel"
 ARG_ENABLE = "enable"
 ARG_DISABLE = "disable"
+ARG_ON = "on"
+ARG_OFF = "off"
 --Local Buffs array, AutoDispell and Load frame
 adFrame = CreateFrame("Frame")
 lFrame = CreateFrame("Frame")
 lbuffs = {}--2d array, profiles & their respective buffs
 profileName = 1
 buffList = 2
-
+local addon_loaded = false
 --Register events
-adFrame:RegisterEvent("UNIT_AURA", arg1)
+adFrame:RegisterEvent("UNIT_AURA", "player")
 lFrame:RegisterEvent("ADDON_LOADED")
+
+local function Alert(target, buff)
+    if alertOnBuff then
+        local targetName = UnitName(target)
+        if alertMsg == nil then
+            alertMsg = string.format("AutoDispell: " .. buff .. " has been automatically removed.")
+        end
+        SendChatMessage(alertMsg, "WHISPER", nil, targetName);
+    end
+end
+
 
 --Helper function for type checking
 local function is_int(n)
@@ -92,8 +107,10 @@ local function PrintHelp()
     print("/ad buffs - Lists all buffs to be dispelled for the current profile.")
     print("/ad buffs add Buff Name - Adds a buff to the profile, for instance: /ad buffs add Blessing of Salvation")
     print("/ad buffs remove Buff Name - Removes a buff from the profile by name (or index: /ad buffs rm 2)")
-    print("/ad enable / disable - Enables or disables the addon.")
-    
+    print("/ad alert enable / disable (or on / off) - Enables or disables alerting players who cast the buff on you (default is off).")    
+    print("/ad alert add Custom Alert Message - Sets a new alert message.")
+    print("/ad verbose enable / disable (or on / off) - Show a message when a buff was removed.")
+    print("/ad enable / disable (or on / off)- Enables or disables the addon.")
 end
 
 --List all buffs contained in the array
@@ -101,7 +118,7 @@ local function ListBuffs()
     print(string.format("The following buffs are listed to be dispelled for profile %s:", profiles[activeProfile][profileName]))
     if profiles[activeProfile][buffList] ~= nil then
         for i=1, #profiles[activeProfile][buffList] ,1 do
-            print(string.format("%i: %s", i, profiles[activeProfile][buffList][i]))
+            print(i .. ": " .. profiles[activeProfile][buffList][i])
         end
     else       
         print("No buffs listed, use /autod add 'Buff Name' to add a new buff to list")
@@ -129,9 +146,9 @@ local function AddBuff(buff)
         else
             profiles[activeProfile][buffList][1] = buff
         end
-        print(string.format("Added: %s to list.", buff))
+        print("Added: " .. buff .. " to list.")
     else
-        print(string.format("%s is already included in list.", buff))
+        print(buff .. " is already included in list.")
     end
 end
 
@@ -139,7 +156,7 @@ end
 --Removes a buff by index.
 local function RemoveBuffByIndex(i)
     if buffs[i] ~= nil then
-        print(string.format("Removed %s from list", buffs[i]))
+        print("Removed " .. buffs[i] .. " from list")
         table.remove(buffs, i)
     else        
         print("No buffs were removed. Are you sure the buff is listed?")
@@ -154,7 +171,7 @@ local function RemoveBuff(val)
         if valn <= table.getn(profiles[activeProfile][buffList]) and valn > 0 then
             local rmbuff = profiles[activeProfile][buffList][valn]
             table.remove(profiles[activeProfile][buffList], valn)
-            print(string.format("Removed buff: '%s'", rmbuff))
+            print("Removed buff: '" .. rmbuff .. "'")
         else
             print("Buff not found.")
         end
@@ -163,7 +180,7 @@ local function RemoveBuff(val)
     else
         local rmbuff = get_buff_index(profiles, val)
         table.remove(profiles[activeProfile][buffList], valn)
-        print(string.format("Removed buff: '%s'", val))                
+        print("Removed buff: '" .. val .. "'")                
     end
 end
 
@@ -173,19 +190,24 @@ local function RemoveEventBinding()
     print("AutoDispell is disabled use /ad enable to enable it.")
 end
 
-local function Dispell(unit)
-    --Unpack the vararg into the variable(s) it contains
-    --If the event didn't fire on player, return
-    if unit ~= "player" then
+local function Dispell(...)
+
+    if ... ~= "player" then
         return
-    end
+    end    
+
     for i=1,#profiles[activeProfile][buffList],1 do
         for j=1,32,1 do
+            local name, rank, icon, count, dispelType, duration, caster, _, _, _, _, _, _, _, _, _, _ = UnitBuff("player", j)
+           
             --See if the player the buff
-            if UnitBuff(unit, j) == tostring(profiles[activeProfile][buffList][i]) then
+            if name == tostring(profiles[activeProfile][buffList][i]) then 
                 --Dispell it
-                CancelUnitBuff(unit, j)
-                print("Canceled: ", tostring(profiles[activeProfile][buffList][i]))
+                CancelUnitBuff("player", j)
+                Alert(caster, name)
+                if verbose then
+                    print("Canceled: " .. profiles[activeProfile][buffList][i])
+                end
             end
         end
     end
@@ -204,9 +226,9 @@ local function ListProfiles()
     print("Profiles:")
     for i=1, #profiles,1 do
         if activeProfile == i then
-            print(string.format("%i: %s (Active)", i, profiles[i][profileName]))
+            print(string.format(i .. ": ".. profiles[i][profileName]) .. " (Active)")
         else
-            print(string.format("%i: %s", i, profiles[i][profileName]))
+            print(i .. ": " .. profiles[i][profileName])
         end
     end
 end
@@ -217,10 +239,10 @@ local function SetProfile(val)
         valn = tonumber(val)
         if valn <= table.getn(profiles) and valn >= 1 then
             if valn == activeProfile then
-                print(string.format("Profile: '%s' is already selected.", profiles[valn][profileName]))
+                print("Profile: '" .. profiles[valn][profileName] .. "' is already selected.")
             else
                 activeProfile = valn
-                print(string.format("Selected profile: '%s'", profiles[activeProfile][profileName]))
+                print("Selected profile: '" .. profiles[activeProfile][profileName] .. "'")
             end
         else
             print("Profile does not exist")
@@ -228,10 +250,10 @@ local function SetProfile(val)
     else
         if has_value(profiles, val, profileName) then 
             if activeProfile == get_index(profiles, val) then
-                print(string.format("Profile: '%s' is already selected.", val))
+                print("Profile: '" .. val .. "' is already selected.")
             else
                 activeProfile = get_index(profiles, val)
-                print(string.format("Selected profile: '%s'", profiles[activeProfile][profileName]))                
+                print("Selected profile: '" .. profiles[activeProfile][profileName] .. "'")                
             end
         else
             print("Profile does not exist")
@@ -245,13 +267,13 @@ local function AddProfile(name)
         print("Please enter a valid profile name.")
         return
     elseif has_value(profiles, name, profileName) then 
-        print(string.format("Profile: '%s' already exists", name))
+        print("Profile: '" .. name .. "' already exists")
     else
         local add_profile_pos = #profiles+1
         profiles[add_profile_pos] = {}
         profiles[add_profile_pos][profileName] = name
         profiles[add_profile_pos][buffList] = {}
-        print(string.format("Added new profile: %s", name))
+        print("Added new profile: " .. name)
         SetProfile(name)          
     end
     return true
@@ -292,7 +314,8 @@ end
 --Initial first run binding
 --If buff variable is empty, fill it with a new local array.
 lFrame:SetScript("OnEvent", function(self, event, ...) 
-    if event == "ADDON_LOADED" then
+    if event == "ADDON_LOADED" and not addon_loaded then
+        addon_loaded = true
         if activeProfile == nil then
             activeProfile = 1
         end
@@ -305,6 +328,12 @@ lFrame:SetScript("OnEvent", function(self, event, ...)
         --Set default profile buffs if addon has been in use     
         if buffs ~= nil then
             profiles[activeProfile][buffList] = buffs
+        end
+        if alertOnBuff == nil then
+            alertOnBuff = false
+        end
+        if verbose == nil then
+            verbose = false
         end
         if isEnabled == nil then
             print("AutoDispell has been automatically enabled. Use /ad to configure it.")
@@ -324,25 +353,16 @@ SlashCmdList["AUTOD"] = function(msg, editbox)
     -- pattern matching that skips leading whitespace and whitespace between cmd and args
     -- any whitespace at end of args is retained
     local _, _, cmd, args = string.find(msg, "%s?(%w+)%s?(.*)")
-
+ 
     if args == nil then
         PrintHelp()
     end
-    if cmd == ARG_ENABLE then
-        if not isEnabled then
-            AddEventBinding()
-            isEnabled = true
-            print("AutoDispell has been enabled.")
-        else
-            print("AutoDispell is already enabled.")
-        end
-    elseif cmd == ARG_DISABLE then
-        if isEnabled then
-            RemoveEventBinding()
-            isEnabled = false
-        else
-            print("AutoDispell is already disabled.")
-        end
+    if cmd == ARG_ENABLE or cmd == ARG_ON then        
+        print("AutoDispell " .. (isEnabled and 'is already enabled.' or 'has been enabled.'))
+        isEnabled = true
+    elseif cmd == ARG_DISABLE or cmd == ARG_OFF then
+        print("AutoDispell " .. (isEnabled and 'has been disabled.' or 'is already disabled.'))
+        isEnabled = false
     elseif cmd == ARG_PLIST then
         splitargs = split(args);
         if splitargs[1] == nil then
@@ -359,7 +379,7 @@ SlashCmdList["AUTOD"] = function(msg, editbox)
         end
     elseif cmd == ARG_BUFF then          
         splitargs = split(args);  
-         if splitargs[1] == nil then
+        if splitargs[1] == nil then
             ListBuffs()
         elseif splitargs[1] == ARG_ADD then
             table.remove(splitargs, 1)
@@ -370,6 +390,34 @@ SlashCmdList["AUTOD"] = function(msg, editbox)
             table.remove(splitargs, 1)
             local buff = table.concat(splitargs, " ")
             RemoveBuff(buff)
+        end
+    elseif cmd == ARG_ALERT then
+        splitargs = split(args);
+        if splitargs[1] == nil then
+            print("Alerts are currently " .. (alertOnBuff and 'enabled.' or 'disabled.'))            
+        elseif splitargs[1] == ARG_ADD then
+            table.remove(splitargs, 1)
+            local msg = table.concat(splitargs, " ")
+            alertMsg = msg
+            print("Alert message has been set to " .. msg)
+        elseif splitargs[1] == ARG_ENABLE or splitargs[1] == ARG_ON then
+                print("Alerts " .. (alertOnBuff and 'are already enabled' or 'enabled'))
+                alertOnBuff = true
+        elseif splitargs[1] == ARG_DISABLE or splitargs[1] == ARG_OFF then
+                print("Alerts " .. (alertOnBuff and 'disabled' or 'are already disabled'))
+                alertOnBuff = false
+        end
+    elseif cmd == ARG_VERB then
+        splitargs = split(args);
+        if splitargs[1] == nil then
+            print("Verbose mode is " .. (verbose and 'enabled.' or 'disabled.')) 
+        end
+        if splitargs[1] == ARG_ON or splitargs[1] == ARG_ENABLE then
+            print("Verbose mode " .. (verbose and 'is already enabled' or 'enabled'))
+            verbose = true
+        elseif splitargs[1] == ARG_OFF or splitargs[1] == ARG_DISABLE then
+            print("Verbose mode " .. (verbose and 'disabled' or 'is already disabled'))
+            verbose = false
         end
     end
 end

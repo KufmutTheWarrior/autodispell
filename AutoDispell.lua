@@ -324,11 +324,12 @@ lFrame:SetScript("OnEvent", function(self, event, ...)
             profiles[activeProfile] = {}
             profiles[activeProfile][profileName] = "default"
             profiles[activeProfile][buffList] = {}
+            --Set default profile buffs if addon has been in use     
+            if buffs ~= nil then
+                profiles[activeProfile][buffList] = buffs
+            end
         end   
-        --Set default profile buffs if addon has been in use     
-        if buffs ~= nil then
-            profiles[activeProfile][buffList] = buffs
-        end
+
         if alertOnBuff == nil then
             alertOnBuff = false
         end
